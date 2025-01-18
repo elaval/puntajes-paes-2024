@@ -135,7 +135,7 @@ const options = _.chain([...data])
 
 return view(Inputs.select(options,
   {
-    label: "Comuna",
+    label: "Prioritario",
     format: (d) => `${aliasTipo[d.tipo]} (${d.estudiantes})`
   }
 ))
@@ -156,7 +156,7 @@ const options = _.chain([...data])
 
 return view(Inputs.select(options,
   {
-    label: "Comuna",
+    label: "Dependencia",
     format: (d) => `${aliasDependencia[d.dependencia]} (${d.estudiantes})`
   }
 ))
@@ -185,7 +185,8 @@ const dataPlot = [...data].filter(
     (d) => d.ratingPercentil == "alto"
   ).length;
 
-  display(html`En <b>${comuna}</b> para estudiantes <b>${
+  display(dataPlot.length >= 100 ?
+  (html`En <b>${comuna}</b> para estudiantes <b>${
     tipo == 1 ? "Prioritarios" : "No prioritarios"
   }</b> en establecimientos <b>${
     aliasDependencia[dependencia]
@@ -197,10 +198,11 @@ const dataPlot = [...data].filter(
   Un ${d3.format(".1%")(
     totalEstudiantesDestacados / totalEstudiantes
   )} (${totalEstudiantesDestacados} de ${totalEstudiantes}) está por sobre este rango. `)
+   : html`<span></span>`)
 ```
 
 <div class="card">
-${dodgeChart}
+${dataPlot.length >= 100 ? dodgeChart : 'El número de estudiantes en este grupo es muy pequeño (< 100) y no se considera para evitar generalizaciones incorrectas.'}
 </div>
 
 ```js
@@ -286,6 +288,7 @@ const establecimientosTop = (() => {
 
 ```
 
+
 ### Establecimientos con sobre un 5% de estudiantes en el 2.5% superior del grupo 
 (${comuna}/${aliasDependencia[dependencia]}/${aliasTipo[tipo]})
 ${establecimientosTop
@@ -295,4 +298,4 @@ ${establecimientosTop
         html`<li>${d.NOM_RBD} ${d.estudiantesSobreLoEsperado} de ${
           d.totalEstudiantes
         } (${d3.format(".1%")(d.porcentaje)})`
-    )}
+    )}` 
