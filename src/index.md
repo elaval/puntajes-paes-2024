@@ -53,7 +53,7 @@ LEFT JOIN intervalosPorComuna on directorio.NOM_COM_RBD = intervalosPorComuna.NO
   AND intervalosPorComuna.dependencia = tabla.dependencia
 ```
 
-```sql id=indicadoresPorComuna display
+```sql id=indicadoresPorComuna
 WITH tabla as (SELECT *, puntaje as PROMEDIO_PAES,
 FROM paes),
 
@@ -212,7 +212,7 @@ const dodgeChart = (() => {
     .mean()
     .value();
 
-  const height = width * 0.75;
+  const height = width * 0.5;
 
   const r = Math.sqrt((height * width) / dataPlot.length / Math.PI / factor);
   return Plot.plot({
@@ -284,5 +284,15 @@ const establecimientosTop = (() => {
 
 })()
 
-display(Inputs.table(establecimientosTop))
 ```
+
+### Establecimientos con sobre un 5% de estudiantes en el 2.5% superior del grupo 
+(${comuna}/${aliasDependencia[dependencia]}/${aliasTipo[tipo]})
+${establecimientosTop
+    .filter((d) => d.porcentaje > 0.025)
+    .map(
+      (d) =>
+        html`<li>${d.NOM_RBD} ${d.estudiantesSobreLoEsperado} de ${
+          d.totalEstudiantes
+        } (${d3.format(".1%")(d.porcentaje)})`
+    )}
