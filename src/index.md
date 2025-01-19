@@ -32,8 +32,9 @@ intervalosPorComuna AS (
 SELECT  
   tabla.MRUN, 
   directorio.RBD,
-  directorio.NOM_COM_RBD,
   directorio.NOM_RBD,
+  directorio.NOM_COM_RBD,
+  directorio.COD_REG_RBD,
   N,
   tabla.dependencia,
   tabla.tipo,
@@ -95,6 +96,9 @@ const aliasTipo = {
 ```
 
 ```js
+const region = selectRegion.region
+```
+```js
 const comuna = selectComuna.comuna
 ```
 ```js
@@ -104,9 +108,31 @@ const tipo = selectTipo.tipo
 const dependencia = selectDependencia.dependencia
 ```
 
+
+```js
+const selectRegion =  (() => {
+const options = _.chain([...data])
+  .groupBy((d) => d.COD_REG_RBD)
+  .map((items, key) => ({ region: key, estudiantes: items.length }))
+  .filter(d => d.region !== "null")
+  .sortBy((d) => ordenRegiones[d.region])
+  .value()
+
+return view(Inputs.select(options,
+  {
+    label: "Región",
+    format: (d) => `${aliasRegiones[d.region]}`
+  }
+))
+})()
+
+```
+
+
 ```js
 const selectComuna =  (() => {
 const optionsComunas = _.chain([...data])
+  .filter((d) => d.COD_REG_RBD == region)
   .groupBy((d) => d.NOM_COM_RBD)
   .map((items, key) => ({ comuna: key, estudiantes: items.length }))
   .sortBy((d) => d.estudiantes)
@@ -116,27 +142,7 @@ const optionsComunas = _.chain([...data])
 return view(Inputs.select(optionsComunas,
   {
     label: "Comuna",
-    format: (d) => `${d.comuna} (${d.estudiantes})`
-  }
-))
-})()
-
-```
-
-```js
-const selectTipo =  (() => {
-const options = _.chain([...data])
-    .filter((d) => d.NOM_COM_RBD == comuna)
-    .groupBy((d) => d.tipo)
-    .map((items, key) => ({ tipo: key, estudiantes: items.length }))
-    .sortBy((d) => d.estudiantes)
-    .reverse()
-    .value();
-
-return view(Inputs.select(options,
-  {
-    label: "Prioritario",
-    format: (d) => `${aliasTipo[d.tipo]} (${d.estudiantes})`
+    format: (d) => `${d.comuna} (${d.estudiantes} estudiantes)`
   }
 ))
 })()
@@ -147,7 +153,7 @@ return view(Inputs.select(options,
 ```js
 const selectDependencia =  (() => {
 const options = _.chain([...data])
-    .filter((d) => d.NOM_COM_RBD == comuna && d.tipo == tipo)
+    .filter((d) => d.NOM_COM_RBD == comuna)
     .groupBy((d) => d.dependencia)
     .map((items, key) => ({ dependencia: key, estudiantes: items.length }))
     .sortBy((d) => d.estudiantes)
@@ -157,12 +163,34 @@ const options = _.chain([...data])
 return view(Inputs.select(options,
   {
     label: "Dependencia",
-    format: (d) => `${aliasDependencia[d.dependencia]} (${d.estudiantes})`
+    format: (d) => `${aliasDependencia[d.dependencia]} (${d.estudiantes} estudiantes)`
   }
 ))
 })()
 
 ```
+
+```js
+const selectTipo =  (() => {
+const options = _.chain([...data])
+    .filter((d) => d.NOM_COM_RBD == comuna && d.dependencia == dependencia)
+    .groupBy((d) => d.tipo)
+    .map((items, key) => ({ tipo: key, estudiantes: items.length }))
+    .sortBy((d) => d.estudiantes)
+    .reverse()
+    .value();
+
+return view(Inputs.select(options,
+  {
+    label: "Prioritario",
+    format: (d) => `${aliasTipo[d.tipo]} (${d.estudiantes} estudiantes)`
+  }
+))
+})()
+
+```
+
+
 
 ```js
 const dataPlot = [...data].filter(
@@ -186,23 +214,21 @@ const dataPlot = [...data].filter(
   ).length;
 
   display(dataPlot.length >= 100 ?
-  (html`En <b>${comuna}</b> para estudiantes <b>${
+  (html`Comuna <b>${comuna}</b>, estudiantes <b>${
     tipo == 1 ? "Prioritarios" : "No prioritarios"
   }</b> en establecimientos <b>${
     aliasDependencia[dependencia]
-  }</b>, <br>el <b>95%</b> de los estudiantes obtiene un puntaje entre <b>${d3.format(
+  }</b> <br><br>El <b>95%</b> de los estudiantes obtiene un puntaje entre <b>${d3.format(
     ".0f"
   )(registroFoco.p2_5)}</b> y <b>${d3.format(".0f")(
     registroFoco.p97_5
   )}</b><br><br>
-  Un ${d3.format(".1%")(
-    totalEstudiantesDestacados / totalEstudiantes
-  )} (${totalEstudiantesDestacados} de ${totalEstudiantes}) está por sobre este rango. `)
+  <b>${totalEstudiantesDestacados} estudiantes que están por sobre ese rango</b> provienen de ${establecimientosTop.length} establecimientos`)
    : html`<span></span>`)
 ```
 
 <div class="card">
-${dataPlot.length >= 100 ? dodgeChart : 'El número de estudiantes en este grupo es muy pequeño (< 100) y no se considera para evitar generalizaciones incorrectas.'}
+${dataPlot.length >= 100 ? dodgeChart : 'El número de estudiantes en este grupo es reducido (< 100) y el detalle se omite para evitar generalizaciones incorrectas.'}
 </div>
 
 ```js
@@ -249,6 +275,7 @@ const dodgeChart = (() => {
               ? "red"
               : "lightgrey",
           tip: true,
+          title: d => `Puntaje: ${d.PROMEDIO_PAES}\n${d.NOM_RBD}`,
           channels: {
             RBD: "RBD",
             Establecimiento: "NOM_RBD",
@@ -277,7 +304,7 @@ const establecimientosTop = (() => {
       porcentaje:
         items.filter((d) => d.ratingPercentil == "alto").length / items.length
     }))
-    .filter((d) => d.totalEstudiantes > 10 && d.porcentaje >= 0.05)
+    .filter(d => d.estudiantesSobreLoEsperado > 0)
     .sortBy((d) => d.porcentaje)
     .reverse()
     .value();
@@ -288,9 +315,26 @@ const establecimientosTop = (() => {
 
 ```
 
+```js
+display(dataPlot.length >= 100 
+? html`<h3> Establecimientos con mayor proporción de estudiates en el segmento superior (sobre percentil 97,5%) </h3>
+${comuna} | ${aliasDependencia[dependencia]} | ${aliasTipo[tipo]}
+<ul>
+${establecimientosTop
+    .filter((d) => d.porcentaje > 0.025)
+    .map(
+      (d) =>
+        html`<li>${d.NOM_RBD} ${d.estudiantesSobreLoEsperado} de ${
+          d.totalEstudiantes
+        } (${d3.format(".1%")(d.porcentaje)})`
+    )} 
+  </ul>
+`
+: html`<span></span>`)
 
-### Establecimientos con sobre un 5% de estudiantes en el 2.5% superior del grupo 
+/*display(html`### Establecimientos con mayor proporción de estudiates en el segmento superior (sobre percentil 97,5%) 
 (${comuna}/${aliasDependencia[dependencia]}/${aliasTipo[tipo]})
+<ul>
 ${establecimientosTop
     .filter((d) => d.porcentaje > 0.025)
     .map(
@@ -299,3 +343,47 @@ ${establecimientosTop
           d.totalEstudiantes
         } (${d3.format(".1%")(d.porcentaje)})`
     )}` 
+  </ul>`)*/
+
+
+```
+
+```js
+const aliasRegiones = ({
+  15: "De Arica y Parinacota",
+  1: "De Tarapacá",
+  2: "De Antofagasta",
+  3: "De Atacama",
+  4: "De Coquimbo",
+  5: "De Valparaíso",
+  13: "Metropolitana de Santiago",
+  6: "Del Libertador B. O'Higgins",
+  7: "Del Maule",
+  16: "De Ñuble",
+  8: "Del Bíobío",
+  9: "De La Araucanía",
+  14: "De Los Ríos",
+  10: "De Los Lagos",
+  11: "De Aisén del Gral. C. Ibáñez del Campo",
+  12: "De Magallanes y de La Antártica Chilena"
+})
+
+const ordenRegiones = ({
+  15: 0,
+  1: 1,
+  2: 2,
+  3: 3,
+  4: 4,
+  5: 5,
+  13: 6,
+  6: 7,
+  7: 8,
+  16:9,
+  8: 10,
+  9: 11,
+  14: 12,
+  10: 13,
+  11: 14,
+  12: 15
+})
+```
