@@ -5,6 +5,10 @@ sql:
   paes: ./data/ANALISIS_PAES20204.parquet
 ---
 
+# Distribución de estudiantes en contextos similares
+## Se considera la comuna, dependencia y tipo de estudiante (prioritario / no priorotario) para analizar la distribución de estudiantes en dicho grupo.
+
+
 ```sql id=data
 WITH tabla as (SELECT *, puntaje as PROMEDIO_PAES,
 FROM paes),
@@ -32,6 +36,7 @@ intervalosPorComuna AS (
 SELECT  
   tabla.MRUN, 
   directorio.RBD,
+  directorio.COD_DEPE2,
   directorio.NOM_RBD,
   directorio.NOM_COM_RBD,
   directorio.COD_REG_RBD,
@@ -83,7 +88,7 @@ FROM intervalosPorComuna
 ```
 
 ```js
-const factor = 10
+
 const aliasDependencia = {
   PP: "Particular Pagados",
   PS: "Particular Subvencionados",
@@ -227,11 +232,18 @@ const dataPlot = [...data].filter(
    : html`<span></span>`)
 ```
 
+
+
 <div class="card">
 ${dataPlot.length >= 100 ? dodgeChart : 'El número de estudiantes en este grupo es reducido (< 100) y el detalle se omite para evitar generalizaciones incorrectas.'}
 </div>
 
 ```js
+const factor = 10
+const heightFactor = 0.5
+```
+```js
+
 const dodgeChart = (() => {
   //return dataPlot;
 
@@ -240,9 +252,9 @@ const dodgeChart = (() => {
     .mean()
     .value();
 
-  const height = width * 0.5;
+  const height = width * heightFactor;
 
-  const r = Math.sqrt((height * width) / dataPlot.length / Math.PI / factor);
+  const r = Math.sqrt(((height-80) * (width-20)) / (dataPlot.length * Math.PI * factor));
   return Plot.plot({
     height: height,
     width: width,
@@ -275,7 +287,7 @@ const dodgeChart = (() => {
               ? "red"
               : "lightgrey",
           tip: true,
-          title: d => `Puntaje: ${d.PROMEDIO_PAES}\n${d.NOM_RBD}`,
+          title: d => `Puntaje: ${d.PROMEDIO_PAES}\n${d.NOM_RBD}\n${aliasDependencia2[d.COD_DEPE2]}`,
           channels: {
             RBD: "RBD",
             Establecimiento: "NOM_RBD",
@@ -308,11 +320,7 @@ const establecimientosTop = (() => {
     .sortBy((d) => d.porcentaje)
     .reverse()
     .value();
-
- 
-
 })()
-
 ```
 
 ```js
@@ -321,7 +329,7 @@ display(dataPlot.length >= 100
 ${comuna} | ${aliasDependencia[dependencia]} | ${aliasTipo[tipo]}
 <ul>
 ${establecimientosTop
-    .filter((d) => d.porcentaje > 0.025)
+    .filter((d) => d.porcentaje > 0.025 && d.totalEstudiantes > 10)
     .map(
       (d) =>
         html`<li>${d.NOM_RBD} ${d.estudiantesSobreLoEsperado} de ${
@@ -329,23 +337,162 @@ ${establecimientosTop
         } (${d3.format(".1%")(d.porcentaje)})`
     )} 
   </ul>
+  <div class="muted">Nota: se omiten establecimientos con menos de 10 estudiantes en el grupo seleccionado</div>
 `
 : html`<span></span>`)
+```
 
-/*display(html`### Establecimientos con mayor proporción de estudiates en el segmento superior (sobre percentil 97,5%) 
-(${comuna}/${aliasDependencia[dependencia]}/${aliasTipo[tipo]})
+```sql id=tablaEstablecimientos
+WITH tabla as (SELECT *, puntaje as PROMEDIO_PAES,
+FROM paes),
+
+
+intervalosPorComuna AS (
+    SELECT
+        NOM_COM_RBD,
+        dependencia,
+        tipo,
+        COUNT(*) AS N,
+        AVG(PROMEDIO_PAES) AS puntajePromedio,
+        STDDEV(PROMEDIO_PAES) AS stdev,
+        -- Calcula el percentil 2.5% y 97.5% dentro de cada grupo
+        PERCENTILE_CONT(0.025) WITHIN GROUP (ORDER BY PROMEDIO_PAES) AS p2_5,
+        PERCENTILE_CONT(0.975) WITHIN GROUP (ORDER BY PROMEDIO_PAES) AS p97_5
+    FROM tabla
+    LEFT JOIN directorio ON tabla.RBD = directorio.RBD
+    GROUP BY
+        NOM_COM_RBD,
+        dependencia,
+        tipo
+  ORDER BY NOM_COM_RBD, tipo,dependencia),
+
+detalleEstudiantes as (
+SELECT  
+  tabla.MRUN, 
+  directorio.RBD,
+  directorio.NOM_RBD,
+  directorio.NOM_COM_RBD,
+  directorio.COD_REG_RBD,
+  directorio.COD_DEPE2,
+  N,
+  tabla.dependencia,
+  tabla.tipo,
+  tabla.PROMEDIO_PAES, 
+  p2_5,
+  p97_5,
+  CASE WHEN tabla.PROMEDIO_PAES < p2_5 THEN 'bajo'
+   WHEN tabla.PROMEDIO_PAES > p97_5 THEN 'alto'
+  ELSE 'normal' END as ratingPercentil
+
+
+  
+FROM tabla
+LEFT JOIN directorio on tabla.RBD = directorio.RBD
+LEFT JOIN intervalosPorComuna on directorio.NOM_COM_RBD = intervalosPorComuna.NOM_COM_RBD 
+  AND intervalosPorComuna.tipo = tabla.tipo
+  AND intervalosPorComuna.dependencia = tabla.dependencia),
+
+resumenPorRBD as (
+SELECT RBD,NOM_RBD,
+ NOM_COM_RBD,
+ COD_DEPE2,
+ dependencia, count(*) as N_total, 
+SUM(CASE WHEN ratingPercentil == 'alto' THEN 1 ELSE 0 END)::Int as alto_total,
+SUM(CASE WHEN tipo == 1 THEN 1 ELSE 0 END)::Int as N_prioritario,
+SUM(CASE WHEN tipo == 1 AND ratingPercentil == 'alto' THEN 1 ELSE 0 END)::Int as alto_prioritario,
+
+SUM(CASE WHEN tipo == 0 THEN 1 ELSE 0 END)::Int as N_no_prioritario,
+SUM(CASE WHEN tipo == 0 AND ratingPercentil == 'alto' THEN 1 ELSE 0 END)::Int as alto_no_prioritario,
+
+FROM  detalleEstudiantes
+GROUP BY RBD,NOM_RBD, NOM_COM_RBD,COD_DEPE2,dependencia)
+
+SELECT *, 
+  alto_total/N_total as tasa_total,
+  alto_prioritario/N_prioritario as tasa_prioritario,
+  alto_no_prioritario/N_no_prioritario as tasa_no_prioritario
+FROM resumenPorRBD
+ORDER BY tasa_total DESC
+```
+
+## Establecimientos del país con mayor proporción de estudiantes sobre el percentil 97,5%
+
+```js
+const selectDependeciaRanking =  (() => {
+const options = [
+  1,5,2,3
+];
+
+return view(Inputs.select(options,
+  {
+    label: "Dependencia",
+    format: (d) => `${aliasDependencia2[d]}`
+  }
+))
+})()
+
+```
+
+```js
+// Generate the table for the number of students by type of institution
+html`
+<div class="table-responsive">
+<table class="table tablaEscuela2">
+<thead>
+<tr>
+<th colspan="3"></th>
+<th colspan="2">Total estudiantes</th>
+<th colspan="2">Estudiantes Prioritarios</th>
+</tr>
+<tr>
+<th>Establecimiento</th>
+<th>Comuna</th>
+<th>Dependencia</th>
+<th>Número</th>
+<th>Sobre 97,5%</th>
+<th>Número</th>
+<th>Sobre 97,5%</th>
+</tr>
+</thead>
+<tbody>
+${_.chain([...tablaEstablecimientos])
+.filter(d => d.N_total > 20 && d.tasa_total > 0.025 && d.COD_DEPE2 == selectDependeciaRanking)
+
+.map(d => html`<tr>
+<td>${d.NOM_RBD}</td>
+<td>${d.NOM_COM_RBD}</td>
+<td>${aliasDependencia2[d.COD_DEPE2]}</td>
+<td>${d.N_total}</td>
+<td>${d3.format(".1%")(d.tasa_total)}</td>
+<td>${d.N_prioritario >= 10 ? d.N_prioritario : d.N_prioritario}</td>
+<td>${d.N_prioritario >= 10 ? d3.format(".1%")(d.tasa_prioritario) : "*"}</td>
+
+
+</tr>`).value()}
+<tbody>
+<caption>
+Notas: 
 <ul>
-${establecimientosTop
-    .filter((d) => d.porcentaje > 0.025)
-    .map(
-      (d) =>
-        html`<li>${d.NOM_RBD} ${d.estudiantesSobreLoEsperado} de ${
-          d.totalEstudiantes
-        } (${d3.format(".1%")(d.porcentaje)})`
-    )}` 
-  </ul>`)*/
+<li>Se incluyen establecimientos con 20 o más estudiantes egresados en 2023 con puntaje válido en PAES 2024
+<li>Se incluyen establecimientos con al menos 5% del total de estudiantes sobre el 97.5% superior de puntajes de acuerdo a la respectiva comuna, dependencia y tipo de estudiante (prioritario / no priorotario) 
+<li> (*) Cuando el establecimiento tiene menos de 10 estudiantes prioritarios, se omite la respectva proporción de estudiantes prioritarios sobre el percentil 97,5%.
+</ul>
+</caption>
+</table>
+</div>`
+```
 
 
+
+```js
+const aliasDependencia2 = ({
+  1: "Municipal",
+  2: "Particular Subvencionado",
+  3: "Particular Pagado",
+  4: "Adm. Delegada",
+  5: "Servicio Local",
+
+})
 ```
 
 ```js
