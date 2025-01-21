@@ -5,10 +5,52 @@ sql:
   paes: ./data/ANALISIS_PAES20204.parquet
 ---
 
-# Distribución de estudiantes en contextos similares
-## Se considera la comuna, dependencia y tipo de estudiante (prioritario / no priorotario) para analizar la distribución de estudiantes en dicho grupo.
 
 
+# Mirada alternativa a los puntajes PAES: Comparando peras con peras
+
+Los resultados de las pruebas de selección universitaria nos informan cómo se distribuyen los puntajes según el desempeño en dichas pruebas.
+
+Sin embargo, existe evidencia de que los puntajes están asociados a diferentes variables, entre ellas:
+
+### Comuna
+
+Existen diferencias estadísticamente significativas en los puntajes que obtienen los estudiantes dependiendo de la comuna asociada al establecimiento escolar. Por ejemplo, los estudiantes de Vitacura obtienen mejores resultados que los de Santiago, y estos últimos mejores que los de Angol.
+
+### Dependencia del establecimiento
+
+También hay diferencias estadísticamente significativas en los puntajes según la dependencia del establecimiento educacional. Los estudiantes de establecimientos **particulares pagados** obtienen mejores resultados que los de establecimientos **particulares subvencionados**, y estos a su vez mejores que los de establecimientos **municipales**.
+
+### Nivel Socioeconómico: Prioritario vs. No Prioritario
+
+Para incluir el nivel socioeconómico en el análisis, una variable útil es si el estudiante es **prioritario** o **no prioritario**. El Ministerio de Educación (Mineduc) clasifica a los estudiantes como prioritarios en base a antecedentes socioeconómicos que estarían asociados a una mayor dificultad en los procesos de aprendizaje.
+
+Existen diferencias estadísticamente significativas en los puntajes obtenidos por estudiantes prioritarios y no prioritarios, siendo los estudiantes prioritarios quienes obtienen puntajes más bajos.
+
+Además, estas variables (comuna, dependencia y ser prioritario) interactúan entre sí. Por ejemplo, los estudiantes **no prioritarios** de establecimientos **municipales** obtienen mejores resultados que los estudiantes **prioritarios** en establecimientos **particulares subvencionados**.
+
+### Grupo de Referencia
+
+En esta página, presento resultados de análisis considerando un "grupo de referencia" que incluye a los estudiantes que provienen de la misma comuna, misma dependencia y que pertenecen al grupo de estudiantes prioritarios o no prioritarios.
+
+Todos los estudiantes de un grupo (por ejemplo, **no prioritarios** de colegios **privados** en **Vitacura**) pueden obtener puntajes relativamente altos. Obtener 900 puntos puede no ser excepcionalmente alto y no está necesariamente asociado al establecimiento, sino a características personales del estudiante dentro de ese grupo de referencia.
+
+Por otro lado, un estudiante **prioritario** en un establecimiento **municipal** de **Temuco** que obtiene 900 puntos puede considerarse excepcionalmente alto, ya que una proporción muy pequeña de los estudiantes en ese grupo lo alcanza.
+
+### Proporción de Puntajes Excepcionales
+
+Todos los establecimientos educacionales pueden tener una proporción pequeña de estudiantes con puntajes excepcionalmente altos. Sin embargo, **aquellos establecimientos con una mayor proporción de estudiantes en el segmento superior de su grupo son indicadores de una situación que merece atención**. Esto puede deberse a una mejor calidad de enseñanza o a una concentración de mejores estudiantes por diversas razones.
+
+### Cómo Utilizar la Página
+
+A continuación, puedes seleccionar una combinación de **Comuna**, **Dependencia** y **Tipo de estudiante** (Prioritario / No prioritario) para visualizar la distribución de los puntajes de todos los jóvenes en ese grupo que egresaron de educación media en 2023 y dieron la PAES en el proceso regular de 2024.
+
+En esta distribución, identificamos al **2,5%** de los estudiantes con los puntajes más bajos, al **2,5%** con los puntajes más altos y al **95%** restante de los estudiantes entre estos dos extremos.
+
+Consideramos a los estudiantes en el **2,5% superior** (por encima del percentil 97,5) como un foco de análisis debido a sus puntajes considerablemente altos.
+
+
+*Seleccione un grupo de referencia para observar como se distribuyen los puntajes en dicho grupo:*
 ```sql id=data
 WITH tabla as (SELECT *, puntaje as PROMEDIO_PAES,
 FROM paes),
@@ -325,7 +367,7 @@ const establecimientosTop = (() => {
 
 ```js
 display(dataPlot.length >= 100 
-? html`<h3> Establecimientos con mayor proporción de estudiates en el segmento superior (sobre percentil 97,5%) </h3>
+? html`<h3> Establecimientos con mayor proporción de estudiantes en el segmento superior (sobre percentil 97,5%) </h3>
 ${comuna} | ${aliasDependencia[dependencia]} | ${aliasTipo[tipo]}
 <ul>
 ${establecimientosTop
@@ -415,7 +457,7 @@ FROM resumenPorRBD
 ORDER BY tasa_total DESC
 ```
 
-## Establecimientos del país con mayor proporción de estudiantes sobre el percentil 97,5%
+## Establecimientos del país con mayor proporción de estudiantes sobre el percentil 97,5% en su respectivo grupo de referencia
 
 ```js
 const selectDependeciaRanking =  (() => {
@@ -534,3 +576,14 @@ const ordenRegiones = ({
   12: 15
 })
 ```
+
+```sql display
+WITH tabla as (SELECT NOM_COM_RBD, COD_DEPE2,count(*) numEstablecimientos
+FROM directorio
+WHERE COD_DEPE2 = 1 OR COD_DEPE2 = 5
+GROUP BY NOM_COM_RBD, COD_DEPE2)
+
+SELECT *
+FROM tabla
+```
+
