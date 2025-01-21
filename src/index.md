@@ -202,7 +202,7 @@ const selectDependencia =  (() => {
 const options = _.chain([...data])
     .filter((d) => d.NOM_COM_RBD == comuna)
     .groupBy((d) => d.dependencia)
-    .map((items, key) => ({ dependencia: key, estudiantes: items.length }))
+    .map((items, key) => ({ dependencia: key, COD_DEPE2: ![1,5].includes(items[0].COD_DEPE2) ? items[0].COD_DEPE2: slepComuna.esSLEP ? 5 : 1, estudiantes: items.length }))
     .sortBy((d) => d.estudiantes)
     .reverse()
     .value();
@@ -210,7 +210,12 @@ const options = _.chain([...data])
 return view(Inputs.select(options,
   {
     label: "Dependencia",
-    format: (d) => `${aliasDependencia[d.dependencia]} (${d.estudiantes} estudiantes)`
+    format: (d) => `${ d.dependencia !== 'PUB' 
+    ? aliasDependencia[d.dependencia]
+    : slepComuna.esSLEP
+    ? aliasDependencia2[5]
+    : aliasDependencia2[1]
+    } (${d.estudiantes} estudiantes)`
   }
 ))
 })()
@@ -498,7 +503,7 @@ html`
 </thead>
 <tbody>
 ${_.chain([...tablaEstablecimientos])
-.filter(d => d.N_total > 20 && d.tasa_total > 0.025 && d.COD_DEPE2 == selectDependeciaRanking)
+.filter(d => d.N_total > 20 && d.tasa_total > 0.05 && d.COD_DEPE2 == selectDependeciaRanking)
 
 .map(d => html`<tr>
 <td>${d.NOM_RBD}</td>
@@ -517,6 +522,7 @@ Notas:
 <ul>
 <li>Se incluyen establecimientos con 20 o más estudiantes egresados en 2023 con puntaje válido en PAES 2024
 <li>Se incluyen establecimientos con al menos 5% del total de estudiantes sobre el 97.5% superior de puntajes de acuerdo a la respectiva comuna, dependencia y tipo de estudiante (prioritario / no priorotario) 
+<li> Los establecimientos con Administraciín Delegada se consideran junto a los Particulares Subvencionados en el grupo de referencia}
 <li> (*) Cuando el establecimiento tiene menos de 10 estudiantes prioritarios, se omite la respectva proporción de estudiantes prioritarios sobre el percentil 97,5%.
 </ul>
 </caption>
@@ -577,13 +583,14 @@ const ordenRegiones = ({
 })
 ```
 
-```sql display
+```sql id=[slepComuna]
 WITH tabla as (SELECT NOM_COM_RBD, COD_DEPE2,count(*) numEstablecimientos
 FROM directorio
 WHERE COD_DEPE2 = 1 OR COD_DEPE2 = 5
 GROUP BY NOM_COM_RBD, COD_DEPE2)
 
-SELECT *
+SELECT NOM_COM_RBD, COD_DEPE2 = 5 as esSLEP
 FROM tabla
+WHERE NOM_COM_RBD  = ${comuna}
 ```
 
