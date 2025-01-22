@@ -133,8 +133,8 @@ FROM intervalosPorComuna
 ```js
 
 const aliasDependencia = {
-  PP: "Particular Pagados",
-  PS: "Particular Subvencionados",
+  PP: "Particular Pagado",
+  PS: "Particular Subvencionado",
   PUB: "Municipales / Servicios Locales"
 }
 const aliasTipo = {
@@ -304,6 +304,14 @@ const dodgeChart = (() => {
 
   const r = Math.sqrt(((height-80) * (width-20)) / (dataPlot.length * Math.PI * factor));
   return Plot.plot({
+    title:`${comuna} | ${ dependencia !== 'PUB' 
+    ? aliasDependencia[dependencia]
+    : slepComuna.esSLEP
+    ? aliasDependencia2[5]
+    : aliasDependencia2[1]
+    } | ${aliasTipo[tipo]}`,
+    subtitle:`Jóvenes egresados de Ed Media en 2023 con puntaje válido en PAES 2024`,
+    caption:`Autor: @elaval.bsky.social | Fuente: Datos abiertos Mineduc`,
     height: height,
     width: width,
     x: { domain: [0, 1000] },
