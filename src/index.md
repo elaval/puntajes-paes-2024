@@ -8,6 +8,7 @@ sql:
 
 
 # Mirada alternativa a los puntajes PAES: Comparando peras con peras
+## Autor: [@elaval.bsky.social](https://bsky.app/profile/elaval.bsky.social)
 
 Los resultados de las pruebas de selección universitaria nos informan cómo se distribuyen los puntajes según el desempeño en dichas pruebas.
 
@@ -373,7 +374,12 @@ const establecimientosTop = (() => {
 ```js
 display(dataPlot.length >= 100 
 ? html`<h3> Establecimientos con mayor proporción de estudiantes en el segmento superior (sobre percentil 97,5%) </h3>
-${comuna} | ${aliasDependencia[dependencia]} | ${aliasTipo[tipo]}
+${comuna} | ${ dependencia !== 'PUB' 
+    ? aliasDependencia[dependencia]
+    : slepComuna.esSLEP
+    ? aliasDependencia2[5]
+    : aliasDependencia2[1]
+    } | ${aliasTipo[tipo]}
 <ul>
 ${establecimientosTop
     .filter((d) => d.porcentaje > 0.025 && d.totalEstudiantes > 10)
@@ -522,7 +528,7 @@ Notas:
 <ul>
 <li>Se incluyen establecimientos con 20 o más estudiantes egresados en 2023 con puntaje válido en PAES 2024
 <li>Se incluyen establecimientos con al menos 5% del total de estudiantes sobre el 97.5% superior de puntajes de acuerdo a la respectiva comuna, dependencia y tipo de estudiante (prioritario / no priorotario) 
-<li> Los establecimientos con Administraciín Delegada se consideran junto a los Particulares Subvencionados en el grupo de referencia}
+<li> Los establecimientos con Administraciín Delegada se consideran junto a los Particulares Subvencionados en el grupo de referencia
 <li> (*) Cuando el establecimiento tiene menos de 10 estudiantes prioritarios, se omite la respectva proporción de estudiantes prioritarios sobre el percentil 97,5%.
 </ul>
 </caption>
@@ -530,7 +536,13 @@ Notas:
 </div>`
 ```
 
+## Fuente de datos
+Los datos utilizados en este análisis provienen de Datos Abiertos del MINEDUC (https://datosabiertos.mineduc.cl/).
 
+* Datos de jóvenes egresados de Educación Media: https://datosabiertos.mineduc.cl/notas-de-ensenanza-media-y-percentil-jovenes/
+* Alumnos preferentes, prioritarios y beneficiarios SEP: https://datosabiertos.mineduc.cl/alumnos-preferentes-prioritarios-y-beneficiarios-sep/
+* Pruebas de admisión a la educación superior: https://datosabiertos.mineduc.cl/pruebas-de-admision-a-la-educacion-superior/
+* Directorio de Establecimientos Educacionales: https://datosabiertos.mineduc.cl/directorio-de-establecimientos-educacionales/
 
 ```js
 const aliasDependencia2 = ({
